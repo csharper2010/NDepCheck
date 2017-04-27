@@ -2,7 +2,11 @@
 $srcdir = Join-Path $dir "src"
 
 # build
-$msbuild = "c:\windows\microsoft.net\framework\v4.0.30319\MSBuild.exe"
+if (Get-Command "MSBuild.exe") {
+    $msbuild = "MSBuild.exe"
+} else {
+    $msbuild = "c:\windows\microsoft.net\framework\v4.0.30319\MSBuild.exe"
+}
 $solutionPath = Join-Path $srcdir "NDepCheck.sln"
 Invoke-Expression "$msbuild `"$solutionPath`" /p:Configuration=Release /t:Build"
 

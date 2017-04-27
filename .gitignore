@@ -8,6 +8,7 @@ thumbs.db
 *.nupkg
 
 src/CommonAssemblyInfo.cs
+src/packages
 *.bak
 /ToDos.txt
 /examples/drilldown/files/yy.html
