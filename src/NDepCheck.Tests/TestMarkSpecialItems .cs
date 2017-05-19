@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Linq;
-using NDepCheck.Transforming.SpecialNodeMarking;
+using NDepCheck.Transforming.SpecialItemMarking;
 
 namespace NDepCheck.Tests {
     [TestClass]
@@ -11,11 +11,11 @@ namespace NDepCheck.Tests {
             try {
                 var msi = new MarkSpecialItems();
                 var result = new List<Dependency>();
-                msi.Transform(globalContext, "test", msi.GetTestDependencies(), options.Replace(" ", "\r\n"), "test", result);
+                msi.Transform(globalContext, msi.CreateSomeTestDependencies(), options.Replace(" ", "\r\n"), result);
                 return
-                    result.SelectMany(d => new[] {d.UsingItem, d.UsedItem})
+                    result.SelectMany(d => new[] { d.UsingItem, d.UsedItem })
                         .Distinct()
-                        .Where(i => i.Markers.Any(m => m == mark));
+                        .Where(i => i.MarkersContain(mark));
             } finally {
                 // Also static caches must be reset, as "Mark" modifies Items
                 globalContext.ResetAll();

@@ -10,9 +10,6 @@ namespace NDepCheck.Transforming {
 
         public readonly Option ResetBadOption = new Option("r!", "reset-bad", "", "Reset bad counter to 0", @default: "");
 
-        public readonly Option SetQuestionableOption = new Option("s?", "set-questionable", "",
-            "Set questionable counter to edge counter", @default: "");
-
         public readonly Option IncrementQuestionableOption = new Option("i?", "increment-questionable", "",
             "Increment questionable counter by 1", @default: "", multiple: true);
 
@@ -21,19 +18,17 @@ namespace NDepCheck.Transforming {
 
         public override IEnumerable<Option> AllOptions =>
             base.AllOptions.Concat(new[] {
-                IncrementBadOption, ResetBadOption, SetQuestionableOption,
+                IncrementBadOption, ResetBadOption,
                 IncrementQuestionableOption, ResetQuestionableOption
             });
 
-        protected internal override IEnumerable<Action<Dependency>> Parse(GlobalContext globalContext, [CanBeNull] string argsAsString, [NotNull] [ItemNotNull] IEnumerable<OptionAction> moreOptions) {
+        protected internal override IEnumerable<Action<Dependency>> Parse([NotNull] GlobalContext globalContext, 
+                [CanBeNull] string argsAsString, string defaultReasonForSetBad, bool ignoreCase, 
+                [NotNull] [ItemNotNull] IEnumerable<OptionAction> moreOptionActions) {
             var localResult = new List<Action<Dependency>>();
-            IEnumerable<Action<Dependency>> baseResult = base.Parse(globalContext, argsAsString, new[] {
-                SetBadOption.Action((args, j) => {
-                    localResult.Add(d => d.MarkAsBad());
-                    return j;
-                }),
+            IEnumerable<Action<Dependency>> baseResult = base.Parse(globalContext, argsAsString, defaultReasonForSetBad, ignoreCase, new[] {
                 IncrementBadOption.Action((args, j) => {
-                    localResult.Add(d => d.IncrementBad());
+                    localResult.Add(d => d.IncrementBad(IncrementBadOption.Name));
                     return j;
                 }),
                 ResetBadOption.Action((args, j) => {
@@ -41,18 +36,18 @@ namespace NDepCheck.Transforming {
                     return j;
                 }),
                 SetQuestionableOption.Action((args, j) => {
-                    localResult.Add(d => d.MarkAsQuestionable());
+                    localResult.Add(d => d.MarkAsQuestionable(SetQuestionableOption.Name));
                     return j;
                 }),
                 IncrementQuestionableOption.Action((args, j) => {
-                    localResult.Add(d => d.IncrementQuestionable());
+                    localResult.Add(d => d.IncrementQuestionable(IncrementQuestionableOption.Name));
                     return j;
                 }),
                 ResetQuestionableOption.Action((args, j) => {
                     localResult.Add(d => d.ResetQuestionable());
                     return j;
                 })
-            }.Concat(moreOptions).ToArray());
+            }.Concat(moreOptionActions).ToArray());
             return baseResult.Concat(localResult);
         }
     }

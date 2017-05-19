@@ -1,53 +1,26 @@
 using System;
-
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using JetBrains.Annotations;
 
 namespace NDepCheck.Reading {
-    public interface IReaderFactory : IPlugin {
-        AbstractDependencyReader CreateReader(string fileName, GlobalContext options, bool needsOnlyItemTails);
-    }
-
-    public abstract class AbstractReaderFactory : IReaderFactory {
-        [NotNull]
-        public abstract AbstractDependencyReader CreateReader([NotNull]string fileName, [NotNull]GlobalContext options, bool needsOnlyItemTails);
-
-        public abstract string GetHelp(bool detailedHelp, string filter);
-    }
-
-    public abstract class AbstractDependencyReader {
-        [NotNull]
-        protected readonly string _fullFileName;
-
-        protected AbstractDependencyReader([NotNull]string fileName) {
-            if (string.IsNullOrWhiteSpace(fileName)) {
-                throw new ArgumentException("fileName must be non-empty", nameof(fileName));
+    public abstract class AbstractDependencyReader : IDependencyReader {
+        protected AbstractDependencyReader([NotNull]string fullFileName, string containerUri) {
+            if (string.IsNullOrWhiteSpace(fullFileName)) {
+                throw new ArgumentException("fileName must be non-empty", nameof(fullFileName));
             }
-            _fullFileName = Path.GetFullPath(fileName);
+            FullFileName = fullFileName;
+            ContainerUri = containerUri;
         }
 
         [NotNull]
-        public string FullFileName => _fullFileName;
+        public string FullFileName { get; }
 
         [NotNull]
-        protected abstract IEnumerable<Dependency> ReadDependencies([CanBeNull] InputContext inputContext, int depth, bool ignoreCase);
+        protected string ContainerUri { get; }
 
-        /// <summary>
-        /// Read dependencies from file
-        /// </summary>
-        /// <param name="depth"></param>
-        /// <param name="ignoreCase"></param>
-        /// <returns><c>null</c> if already read in</returns>
-        [CanBeNull]
-        public InputContext ReadDependencies(int depth, bool ignoreCase) {
-            var inputContext = new InputContext(FullFileName);
-            Dependency[] dependencies = ReadDependencies(inputContext, depth, ignoreCase).ToArray();
-            if (!dependencies.Any()) {
-                Log.WriteWarning("No dependencies found in " + FullFileName);
-            }
-            return inputContext;
-        }
+        [NotNull]
+        public abstract IEnumerable<Dependency> ReadDependencies(int depth, bool ignoreCase);
+
+        public abstract void SetReadersInSameReadFilesBeforeReadDependencies([NotNull] IDependencyReader[] readerGang);
     }
 }

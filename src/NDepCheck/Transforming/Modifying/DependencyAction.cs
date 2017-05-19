@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using NDepCheck.Matching;
 
 namespace NDepCheck.Transforming.Modifying {
     public class DependencyAction {
@@ -17,7 +18,7 @@ namespace NDepCheck.Transforming.Modifying {
                 throw new ArgumentException($"Unexpected dependency pattern '{line}' at {fullConfigFileName}/{startLineNo}");
             } else {
                 GroupCollection groups = match.Groups;
-                _match = new DependencyMatch(groups[1].Value, groups[2].Value, groups[3].Value, ignoreCase);
+                _match = new DependencyMatch(null, groups[1].Value, groups[2].Value, null, groups[3].Value, ignoreCase);
                 if (groups[4].Value != "-" && groups[4].Value != "delete") {
                     var effects = new List<Action<Dependency>>();
                     var effectOptions =
@@ -26,21 +27,21 @@ namespace NDepCheck.Transforming.Modifying {
                         if (effect == "-?" || effect == "reset-questionable") {
                             effects.Add(d => d.ResetQuestionable());
                         } else if (effect == "+?" || effect == "mark-questionable") {
-                            effects.Add(d => d.MarkAsQuestionable());
+                            effects.Add(d => d.MarkAsQuestionable(effect));
                         } else if (effect == "?" || effect == "increment-questionable") {
-                            effects.Add(d => d.IncrementQuestionable());
+                            effects.Add(d => d.IncrementQuestionable(effect));
                         } else if (effect == "-!" || effect == "reset-bad") {
                             effects.Add(d => d.ResetBad());
                         } else if (effect == "+!" || effect == "mark-bad") {
-                            effects.Add(d => d.MarkAsBad());
+                            effects.Add(d => d.MarkAsBad(effect));
                         } else if (effect == "!" || effect == "increment-bad") {
-                            effects.Add(d => d.IncrementBad());
+                            effects.Add(d => d.IncrementBad(effect));
                         } else if (effect == "" || effect == "ignore" || effect == "keep") {
                             effects.Add(d => { });
                         } else if (effect.StartsWith("+")) {
-                            effects.Add(d => d.AddMarker(effect.Substring(1)));
+                            effects.Add(d => d.IncrementMarker(effect.Substring(1)));
                         } else if (effect.StartsWith("-")) {
-                            effects.Add(d => d.RemoveMarker(effect.Substring(1)));
+                            effects.Add(d => d.RemoveMarkers(effect.Substring(1), ignoreCase));
                         } else {
                             throw new ArgumentException($"Unexpected dependency directive '{effect}' at {fullConfigFileName}/{startLineNo}");
                         }

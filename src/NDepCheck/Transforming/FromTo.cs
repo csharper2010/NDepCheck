@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using JetBrains.Annotations;
+using NDepCheck.Matching;
 
 namespace NDepCheck.Transforming {
     public class FromTo {
@@ -23,17 +24,17 @@ namespace NDepCheck.Transforming {
         public FromTo AggregateDependency(Dependency d, Dictionary<FromTo, Dependency> edgeCollector) {
             Dependency result;
             if (!edgeCollector.TryGetValue(this, out result)) {
-                result = new Dependency(From, To, d.Source, d.Markers, d.Ct, d.QuestionableCt, d.BadCt, d.ExampleInfo);
+                result = new Dependency(From, To, d.Source, d.MarkerSet, d.Ct, d.QuestionableCt, d.BadCt, d.ExampleInfo);
                 edgeCollector.Add(this, result);
             } else {
                 result.AggregateMarkersAndCounts(d);
             }
-            result.UsingItem.UnionWithMarkers(d.UsingItem.Markers);
-            result.UsedItem.UnionWithMarkers(d.UsedItem.Markers);
+            result.UsingItem.MergeWithMarkers(d.UsingItem.MarkerSet);
+            result.UsedItem.MergeWithMarkers(d.UsedItem.MarkerSet);
             return this;
         }
 
-        public static Dictionary<FromTo, Dependency> AggregateAllDependencies(IEnumerable<Dependency> dependencies) {
+        public static Dictionary<FromTo, Dependency> AggregateAllDependencies([NotNull, ItemNotNull] IEnumerable<Dependency> dependencies) {
             var result = new Dictionary<FromTo, Dependency>();
             foreach (var d in dependencies) {
                 new FromTo(d.UsingItem, d.UsedItem).AggregateDependency(d, result);

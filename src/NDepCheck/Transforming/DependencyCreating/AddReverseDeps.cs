@@ -1,9 +1,10 @@
 ﻿using System.Collections.Generic;
 using JetBrains.Annotations;
+using NDepCheck.Matching;
 
 namespace NDepCheck.Transforming.DependencyCreating {
     public class AddReverseDeps : ITransformer {
-        public static readonly DependencyMatchOptions DependencyMatchOptions = new DependencyMatchOptions();
+        public static readonly DependencyMatchOptions DependencyMatchOptions = new DependencyMatchOptions("reverse");
 
         public static readonly Option RemoveOriginalOption = new Option("ro", "remove-original", "", "If present, original dependency of a newly created reverse dependency is removed", @default:false);
         public static readonly Option AddMarkerOption = new Option("am", "add-marker", "&", "Marker added to newly created reverse dependencies", @default: "none");
@@ -23,14 +24,12 @@ Configuration options: None
 Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)}";
         }
 
-        public bool RunsPerInputContext => false;
-
-        public void Configure(GlobalContext globalContext, string configureOptions, bool forceReload) {
+        public void Configure([NotNull] GlobalContext globalContext, [CanBeNull] string configureOptions, bool forceReload) {
             _ignoreCase = globalContext.IgnoreCase;
         }
 
-        public int Transform(GlobalContext globalContext, [CanBeNull] string dependenciesFilename, IEnumerable<Dependency> dependencies,
-            [CanBeNull] string transformOptions, string dependencySourceForLogging, List<Dependency> transformedDependencies) {
+        public int Transform([NotNull] GlobalContext globalContext, [NotNull, ItemNotNull] IEnumerable<Dependency> dependencies,
+            [CanBeNull] string transformOptions, [NotNull] List<Dependency> transformedDependencies) {
 
             var matches = new List<DependencyMatch>();
             var excludes = new List<DependencyMatch>();
@@ -66,10 +65,10 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
                 if (d.IsMatch(matches, excludes)) {
                     if (fromTos == null ||
                         !FromTo.ContainsMatchingDependency(fromTos, d.UsedItem, d.UsingItem, idempotentPattern)) {
-                        var newDependency = new Dependency(d.UsedItem, d.UsingItem, d.Source, d.Markers, d.Ct,
-                                                           d.QuestionableCt, d.BadCt, d.ExampleInfo, d.InputContext);
+                        var newDependency = new Dependency(d.UsedItem, d.UsingItem, d.Source, d.MarkerSet, d.Ct,
+                                                           d.QuestionableCt, d.BadCt, d.ExampleInfo);
                         if (markerToAdd != null) {
-                            newDependency.AddMarker(markerToAdd);
+                            newDependency.IncrementMarker(markerToAdd);
                         }
                         transformedDependencies.Add(newDependency);
                         added++;
@@ -80,11 +79,7 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
             return Program.OK_RESULT;
         }
 
-        public void AfterAllTransforms(GlobalContext globalContext) {
-            // empty
-        }
-
-        public IEnumerable<Dependency> GetTestDependencies() {
+        public IEnumerable<Dependency> CreateSomeTestDependencies() {
             var a = Item.New(ItemType.SIMPLE, "A");
             var b = Item.New(ItemType.SIMPLE, "B");
             return new[] {

@@ -58,7 +58,7 @@ namespace NDepCheck {
         }
 
         public bool IsMatch(string arg) {
-            return ArgMatches(arg, ShortName, Name) || ArgMatches(arg, MoreNames);
+            return ArgMatches(arg, OneAndMore(ShortName, OneAndMore(Name, MoreNames)));
         }
 
         [NotNull]
@@ -102,8 +102,19 @@ namespace NDepCheck {
             return new OptionAction(this, action);
         }
 
-        public static bool ArgMatches([NotNull] string arg, params string[] option) {
-            return option.Any(o => {
+        private static IEnumerable<T> OneAndMore<T>(T first, IEnumerable<T> rest) {
+            yield return first;
+            foreach (var e in rest) {
+                yield return e;
+            }
+        }
+
+        public static bool ArgMatches([NotNull] string arg, string firstOption, params string[] moreOptions) {
+            return ArgMatches(arg, OneAndMore(firstOption, moreOptions));
+        }
+
+        private static bool ArgMatches(string arg, IEnumerable<string> options) {
+            return options.Any(o => {
                 string lower = arg.ToLowerInvariant();
                 if (lower.StartsWith("/" + o) || lower.StartsWith("-" + o)) {
                     string rest = arg.Substring(1 + o.Length);
@@ -115,8 +126,8 @@ namespace NDepCheck {
         }
 
         [NotNull]
-        public static string ExtractRequiredOptionValue(string[] args, ref int i, string message, bool allowOptionValue = false) {
-            string optionValue = ExtractOptionValue(args, ref i, allowOptionValue);
+        public static string ExtractRequiredOptionValue(string[] args, ref int i, string message, bool allowOptionValue = false, bool allowRedirection = false) {
+            string optionValue = ExtractOptionValue(args, ref i, allowOptionValue, allowRedirection);
             if (string.IsNullOrWhiteSpace(optionValue)) {
                 throw new ArgumentException(message);
             }
@@ -127,7 +138,7 @@ namespace NDepCheck {
         /// Helper method to get option value of value 
         /// </summary>
         [CanBeNull]
-        public static string ExtractOptionValue(string[] args, ref int i, bool allowOptionValue = false) {
+        public static string ExtractOptionValue(string[] args, ref int i, bool allowOptionValue = false, bool allowRedirection = false) {
             string optionValue;
             string arg = args[i];
             string[] argparts = arg.Split(new[] { '=' }, 2);
@@ -149,9 +160,12 @@ namespace NDepCheck {
             } else if (!allowOptionValue && LooksLikeAnOption(optionValue)) {
                 // This is the following option - i is not changed
                 return null;
+            } else if (!allowRedirection && LooksLikeRedirection(optionValue)) {
+                // This is the following option - i is not changed
+                return null;                
             } else if (IsOptionGroupStart(optionValue)) {
                 i = nextI;
-                return CollectMultipleArgs(args, ref i, optionValue);
+                return CollectMultipleArgs(args, ref i);
             } else {
                 i = nextI;
                 return optionValue;
@@ -167,11 +181,15 @@ namespace NDepCheck {
         }
 
         private static bool LooksLikeAnOption(string s) {
-            return !IsHelpOption(s) 
-                   &&  s.Length > 1
+            return !IsHelpOption(s)
+                   && s.Length > 1
                    && (s.StartsWith("-")
                        || s.StartsWith("/") && !s.Substring(1).Contains("/") // this allows some paths with / as option value
                    );
+        }
+
+        private static bool LooksLikeRedirection(string s) {
+            return s == ">" || s == ">>";
         }
 
         public static bool IsHelpOption([CanBeNull] string s) {
@@ -187,33 +205,42 @@ namespace NDepCheck {
         }
 
         [NotNull]
-        private static string CollectMultipleArgs(string[] args, ref int i, string value) {
-            // Collect everything up to }
-            var sb = new StringBuilder();
-            var valueArgs = value.Split(' ', '\t', '\r', '\n').Where(s => !string.IsNullOrWhiteSpace(s));
-            foreach (var v in valueArgs) {
-                sb.AppendLine(v);
-            }
-
-            while (!IsOptionGroupEnd(value)) {
-                if (i >= args.Length - 1) {
+        private static string CollectMultipleArgs(string[] args, ref int i) {
+            int inBracesDepth = 0;
+            var argsList = new List<string>();
+            for (; ; i++) {
+                if (i >= args.Length) {
                     throw new ArgumentException("Missing } at end of options");
                 }
-                value = args[++i]; // TODO: Also do split???
-                sb.AppendLine(value);
+                ProcessLine(args[i], ref inBracesDepth, argsList);
+                if (inBracesDepth <= 0) {
+                    break;
+                }
             }
-            return sb.ToString();
+            return string.Join(Environment.NewLine, argsList);
+        }
+
+        [NotNull]
+        public static string ExtractNextRequiredValue(string[] args, ref int i, string message, bool allowOptionValue = false, bool allowRedirection = false) {
+            string result = ExtractNextValue(args, ref i, allowOptionValue, allowRedirection);
+            if (result == null) {
+                throw new ArgumentException(message);
+            }
+            return result;
         }
 
         [CanBeNull]
-        public static string ExtractNextValue(string[] args, ref int i, bool allowOptionValue = false) {
+        public static string ExtractNextValue(string[] args, ref int i, bool allowOptionValue = false, bool allowRedirection = false) {
             if (i >= args.Length - 1) {
                 return null;
             } else {
                 string value = args[++i];
                 if (IsOptionGroupStart(value)) {
-                    return CollectMultipleArgs(args, ref i, value);
+                    return CollectMultipleArgs(args, ref i);
                 } else if (!allowOptionValue && LooksLikeAnOption(value)) {
+                    --i;
+                    return null;
+                } else if (!allowRedirection && LooksLikeRedirection(value)) {
                     --i;
                     return null;
                 } else {
@@ -222,8 +249,50 @@ namespace NDepCheck {
             }
         }
 
+        public static string[] CollectArgsFromFile([NotNull] string fileName) {
+            var argsList = new List<string>();
+            int inBracesDepth = 0;
+            using (var sr = new StreamReader(fileName)) {
+                for (;;) {
+                    string line = sr.ReadLine();
+                    if (line == null) {
+                        break;
+                    }
+                    ProcessLine(line, ref inBracesDepth, argsList);
+                }
+            }
+            return argsList.ToArray();
+        }
+
+        private static void ProcessLine(string line, ref int inBracesDepth, List<string> argsList) {
+            string trimmedLine = Regex.Replace(line, pattern: "//.*$", replacement: "").Trim();
+            string[] splitLine = trimmedLine.Split(' ', '\t').Select(s => s.Trim()).Where(s => s != "").ToArray();
+
+            if (trimmedLine == "") {
+                // ignore  
+            } else {
+                if (inBracesDepth > 0) {
+                    // lines are not split
+                    argsList.Add(line);
+                } else {
+                    // on depth 0, lines are split
+                    argsList.AddRange(splitLine);
+                }
+
+                // We traverse the line and manage depth as well as single and concatenated args
+                foreach (var s in splitLine) {
+                    if (IsOptionGroupStart(s)) {
+                        ++inBracesDepth;
+                    } else if (IsOptionGroupEnd(s)) {
+                        --inBracesDepth;
+                    }
+                }
+            }
+        }
+
         internal static void ThrowArgumentException(string message, string argsAsString) {
-            throw new ArgumentException(message + " (provided options: " + (argsAsString.Length > 305 ? argsAsString.Substring(0, 300) + "..." : argsAsString) + ")");
+            string singleLine = argsAsString.Replace(Environment.NewLine, " ");
+            throw new ArgumentException(message + Environment.NewLine + "Provided options: " + (singleLine.Length > 305 ? singleLine.Substring(0, 300) + "..." : singleLine));
         }
 
         internal static void Parse([NotNull] GlobalContext globalContext, [CanBeNull] string argsAsString, params OptionAction[] optionActions) {
@@ -231,7 +300,7 @@ namespace NDepCheck {
             if (string.IsNullOrWhiteSpace(argsAsString)) {
                 args = new string[0];
             } else if (IsOptionGroupStart(argsAsString.Trim())) {
-                var list = new List<string>();
+                var argList = new List<string>();
 
                 Match prefixMatch = Regex.Match(argsAsString, @"^([{]|\s|<[.])*");
                 Match suffixMatch = Regex.Match(argsAsString, @"([}]|\s|[.]>)*$");
@@ -246,11 +315,11 @@ namespace NDepCheck {
                         if (line == "") {
                             // ignore;
                         } else {
-                            list.Add(line);
+                            argList.Add(line);
                         }
                     }
                 }
-                args = list.ToArray();
+                args = argList.ToArray();
             } else {
                 args = new[] { argsAsString };
             }
@@ -259,7 +328,7 @@ namespace NDepCheck {
                 new HashSet<Option>(optionActions.Where(oa => oa.Option != null && oa.Option.Required).Select(oa => oa.Option));
 
             for (int i = 0; i < args.Length; i++) {
-                string arg = args[i];
+                string arg = args[i].Trim();
                 OptionAction optionAction = optionActions.FirstOrDefault(oa => oa.Option.IsMatch(arg));
                 if (optionAction != null) {
                     requiredOptions.Remove(optionAction.Option);
@@ -274,7 +343,7 @@ namespace NDepCheck {
                     } else {
                         message = "Invalid option " + arg;
                     }
-                    message += "\r\nAllowed options: " +
+                    message += Environment.NewLine + "Allowed options: " +
                                CreateHelp(optionActions.Select(oa => oa.Option), detailed: false, filter: "");
                     ThrowArgumentException(message, argsAsString);
                 }
@@ -286,7 +355,7 @@ namespace NDepCheck {
         }
 
         [NotNull, ItemNotNull]
-        public static IEnumerable<string> ExpandFilename(string pattern, params string[] extensions) {
+        public static IEnumerable<string> ExpandFilePatternFileNames(string pattern, IEnumerable<string> extensionsForDirectoryReading) {
             if (pattern.StartsWith("@")) {
                 using (TextReader nameFile = new StreamReader(pattern.Substring(1))) {
                     for (;;) {
@@ -313,7 +382,7 @@ namespace NDepCheck {
                     yield return name;
                 }
             } else if (Directory.Exists(pattern)) {
-                foreach (var ext in extensions) {
+                foreach (var ext in extensionsForDirectoryReading) {
                     foreach (string name in Directory.GetFiles(pattern, "*" + ext)) {
                         yield return name;
                     }

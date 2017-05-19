@@ -5,7 +5,8 @@ using JetBrains.Annotations;
 
 namespace NDepCheck {
     public class FileWatcher {
-        [NotNull] private readonly Program _program;
+        [NotNull]
+        private readonly Program _program;
 
         [NotNull]
         public string FullScriptName { get; }
@@ -26,7 +27,7 @@ namespace NDepCheck {
 
         public void AddFile(string fullFileName) {
             if (!_watchers.ContainsKey(fullFileName)) {
-                var watcher = new FileSystemWatcher(Path.GetDirectoryName(fullFileName));
+                var watcher = new FileSystemWatcher(Path.GetDirectoryName(fullFileName) ?? "");
                 watcher.Changed += (o, e) => Trigger(e.FullPath);
                 watcher.EnableRaisingEvents = true;
                 _watchers.Add(fullFileName, watcher);
@@ -63,7 +64,7 @@ namespace NDepCheck {
                 Thread.Sleep(2000);
                 _triggered = false;
                 var writtenMasterFiles = new List<string>();
-                _program.RunFrom(FullScriptName, new string[0], new GlobalContext(), writtenMasterFiles, logCommands: true, showParameters: false);
+                _program.RunFromFile(FullScriptName, new string[0], new GlobalContext(), writtenMasterFiles, logCommands: true, onlyShowParameters: false);
                 _program.WriteWrittenMasterFiles(writtenMasterFiles);
             }
         }

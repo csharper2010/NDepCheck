@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using JetBrains.Annotations;
+using NDepCheck.Matching;
 
 namespace NDepCheck.Transforming.Modifying {
     public class ItemAction {
@@ -38,9 +39,9 @@ namespace NDepCheck.Transforming.Modifying {
                         if (effect == "" || effect == "ignore" || effect == "keep") {
                             effects.Add(d => { });
                         } else if (effect.StartsWith("+")) {
-                            effects.Add(i => i.AddMarker(effect.Substring(1)));
+                            effects.Add(i => i.IncrementMarker(effect.Substring(1)));
                         } else if (effect.StartsWith("-")) {
-                            effects.Add(i => i.RemoveMarker(effect.Substring(1)));
+                            effects.Add(i => i.RemoveMarkers(effect.Substring(1), ignoreCase));
                         } else {
                             throw new ArgumentException(
                                 $"Unexpected item directive '{effect}' at {fullConfigFileName}/{startLineNo}");

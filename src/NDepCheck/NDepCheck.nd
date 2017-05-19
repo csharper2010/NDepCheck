@@ -1,0 +1,82 @@
+// Checkable architectural information for NDepCheck
+
+-cf CheckDeps { -rd
+	$DOTNETITEM ---> DOTNETITEM
+	
+	// Assembly dependencies
+	::** ---> ::** {
+		: ---> ::mscorlib
+		  ---> ::System.**
+		  ---> ::Microsoft.**    
+		  ---> ::Mono.Cecil
+		  ---> ::Mono.Cecil.Pdb
+		  ---> ::NDepCheck
+	}
+	
+	// Namespace dependencies - CURRENTLY ONLY FOR TOPLEVEL NDepCheck
+	* ---> ** {
+		// using own namespace is always ok
+		(**): ---> \1
+	
+		// Compiler-generated types like <>f__AnonymousType1 in top-level namespace
+		: ---> -:
+	
+		  ---> System.**
+		  ---> Microsoft.**
+		  ---> Mono.Cecil.**
+			
+		// Copied Gibraltar interning - may be used by anyone (mhm?)
+		  ---> Gibraltar
+	
+		// Copied JetBrains.Annotations - may be used by anyone
+		  ---> JetBrains.Annotations
+		
+		// NDepCheck namespace architecture - CURRENTLY ONLY FOR TOPLEVEL 
+		// Matching and Markers are "subdrawer" subnamespaces that can be used by everyone
+		NDepCheck:        ---> NDepCheck.Matching
+		                  ---> NDepCheck.Markers
+	
+		// By design (for -wd option), Program can use WebServer
+		NDepCheck:Program ---> NDepCheck.WebServing:WebServer
+	
+		// By design (if no other options are specified), Program can use transformer and writer for dependency checking
+		                  ---> NDepCheck.Transforming.ViolationChecking:CheckDeps
+		                  ---> NDepCheck.Rendering.TextWriting:RuleViolationWriter
+		
+		// By design (for -wd option), Program can use DipWriter
+		                  ---> NDepCheck.Rendering.TextWriting:DipWriter
+	}
+	
+	// Safeguards against some possible bugs
+	:** ---> :** {
+	    // Option extractions for program option must be done via Program, which does ExpandDefinesAndHexChars
+		:CLASS=GlobalContext         ---! :CLASS=Option:MEMBER.NAME=Extract*
+	}
+	
+	// Ensure immutable ("ReadOnly...") classes are really immutable
+	NDepCheck:ReadOnly* ---> : {
+		: -- '_declaresfield  -> '_readonly&_primitive
+		  -- '_declaresfield  -> System:String'_readonly
+		  -- '_declaresfield  -> :IMarkerSet'_readonly
+		  -- '_declaresfield  -> :ReadOnly*'_readonly
+		
+		// By design, we have a HashSet in the ReadOnlyMarkerSet; but no method ever changes it after init in the .ctor
+		:ReadOnlyMarkerSet -- '_declaresfield -> :HashSet
+		
+		// Non-declarations are free to do what they want (maybe properties should also be constrained somehow ... "immutable" is a non-trivial concept)
+		:                  -- '~_declaresfield -> :
+	}
+
+	// Specific rules for immutability project
+	NDepCheck: ---> : {
+	    Program ---! Dependency
+	}
+}
+-tf CheckDeps { -ag }
+
+-wr RuleViolationWriter ..\NDepCheckViolations.txt
+
+-cf ProjectItems { -pl $DOTNETITEM---%NC(Namespace:Class) !(**):(**) }
+-tf ProjectItems
+-tf MarkDeps { -cl -cd -cr }
+-wr RuleViolationWriter ..\NDepCheckViolations~NamespaceClass.txt

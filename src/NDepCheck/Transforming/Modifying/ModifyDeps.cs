@@ -1,10 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using JetBrains.Annotations;
 
 namespace NDepCheck.Transforming.Modifying {
-    public class ModifyDeps : AbstractTransformerWithConfigurationPerInputfile<IEnumerable<DependencyAction>> {
+    public class ModifyDeps : AbstractTransformerWithFileConfiguration<IEnumerable<DependencyAction>> {
         public static readonly Option ModificationsFileOption = new Option("mf", "modifications-file", "filename", "File containing modifications", @default: "");
         public static readonly Option ModificationsOption = new Option("ml", "modifications-list", "modifications", "Inline modifications", orElse: ModificationsFileOption);
 
@@ -70,8 +71,6 @@ Examples:
             return result;
         }
 
-        public override bool RunsPerInputContext => false;
-
         private IEnumerable<DependencyAction> _orderedActions;
 
         public override void Configure([NotNull] GlobalContext globalContext, [CanBeNull] string configureOptions, bool forceReload) {
@@ -86,7 +85,7 @@ Examples:
                 }),
                 ModificationsOption.Action((args, j) => {
                     _orderedActions = GetOrReadChildConfiguration(globalContext,
-                        () => new StringReader(string.Join("\r\n", args.Skip(j + 1))),
+                        () => new StringReader(string.Join(Environment.NewLine, args.Skip(j + 1))),
                         ModificationsOption.ShortName, globalContext.IgnoreCase, "????", forceReload: true);
                     // ... and all args are read in, so the next arg index is past every argument.
                     return int.MaxValue;
@@ -94,7 +93,7 @@ Examples:
             );
         }
 
-        protected override IEnumerable<DependencyAction> CreateConfigurationFromText(GlobalContext globalContext, string fullConfigFileName,
+        protected override IEnumerable<DependencyAction> CreateConfigurationFromText([NotNull] GlobalContext globalContext, string fullConfigFileName,
             int startLineNo, TextReader tr, bool ignoreCase, string fileIncludeStack, bool forceReloadConfiguration,
             Dictionary<string, string> configValueCollector) {
 
@@ -110,8 +109,8 @@ Examples:
             return actions;
         }
 
-        public override int Transform(GlobalContext globalContext, string dependenciesFilename, IEnumerable<Dependency> dependencies,
-            [CanBeNull] string transformOptions, string dependencySourceForLogging, List<Dependency> transformedDependencies) {
+        public override int Transform([NotNull] GlobalContext globalContext, [NotNull, ItemNotNull] IEnumerable<Dependency> dependencies,
+            [CanBeNull] string transformOptions, [NotNull] List<Dependency> transformedDependencies) {
 
             if (_orderedActions == null) {
                 Log.WriteWarning($"No actions configured for {GetType().Name}");
@@ -130,7 +129,7 @@ Examples:
             return Program.OK_RESULT;
         }
 
-        public override IEnumerable<Dependency> GetTestDependencies() {
+        public override IEnumerable<Dependency> CreateSomeTestDependencies() {
             Item a = Item.New(ItemType.SIMPLE, "A");
             Item b = Item.New(ItemType.SIMPLE, "B");
             return new[] {

@@ -33,8 +33,7 @@ namespace NDepCheck.Tests {
         public void TestDOk() {
             WriteDep1To(@"a\b");
             WriteDep2To(@"a\c");
-            Option rr = CheckDeps.RuleRootDirectoryOption;
-            Assert.AreEqual(Program.OK_RESULT, Run($@"{Program.ConfigureOption} CheckDeps {{ {rr} %%\a }}".Split(' ')));
+            Assert.AreEqual(Program.OK_RESULT, Run($@"{Program.ConfigureOption} CheckDeps {{ {CheckDeps.RuleRootDirectoryOption} %%\a }}".Split(' ')));
         }
 
         [TestMethod]
@@ -65,7 +64,7 @@ namespace NDepCheck.Tests {
                 ");
             Write(@"a\b\c", "NDepCheck.TestAssembly.dll.dep",
                 @"+ ..\B.dep
-                  $ DOTNETCALL ---> DOTNETCALL
+                  $ DOTNETITEM ---> DOTNETITEM
                   _B.** ---> **
                   :* ---? **
 
@@ -84,7 +83,7 @@ namespace NDepCheck.Tests {
                   + B.dep
                 ");
             Write(@"a\b", "B.dep",
-                @"$ DOTNETCALL ---> DOTNETCALL
+                @"$ DOTNETITEM ---> DOTNETITEM
                   _A.** ---> **
                   :* ---? **
                 ");
@@ -101,11 +100,10 @@ namespace NDepCheck.Tests {
             WriteDep1To(@"a\b");
             WriteDefaultSetTo(@"a\c");
 
-            Option rr = CheckDeps.RuleRootDirectoryOption;
             int result = Program.Main(new List<string> {
                     $"{Program.ReadOption}=" + GetPath("NDepCheck.TestAssembly.dll"),
                     $"{Program.ReadOption}=" + "NDepCheck.TestAssemblyÄÖÜß.*.dll", "-", "NDepCheck.TestAssemblyÄÖÜß.dll",
-                    $"{Program.ConfigureOption}=", "CheckDeps", "{", rr.Opt + "=" + _basePath + @"\a", "}"
+                    $"{Program.ConfigureOption}=", "CheckDeps", "{", CheckDeps.RuleRootDirectoryOption.Opt + "=" + _basePath + @"\a", "}"
             }.ToArray());
             Assert.AreEqual(Program.OK_RESULT, result);
         }
@@ -120,7 +118,7 @@ namespace NDepCheck.Tests {
         private void WriteDep1To(string directory) {
             Write(directory, "NDepCheck.TestAssembly.dll.dep",
                 @"
-                  $ DOTNETCALL ---> DOTNETCALL
+                  $ DOTNETITEM ---> DOTNETITEM
                   NDepCheck.TestAssembly.** ---> **
                   :* ---? **
 
@@ -132,7 +130,7 @@ namespace NDepCheck.Tests {
         private void WriteDep1PlusTo(string directory) {
             Write(directory, "NDepCheck.TestAssembly.dll.dep", @"+ Dep1Include\Dep1.dep");
             Write(directory + @"\Dep1Include", "Dep1.dep", @"
-                  $ DOTNETCALL ---> DOTNETCALL
+                  $ DOTNETITEM ---> DOTNETITEM
                   NDepCheck.TestAssembly.** ---> **
                   :* ---? **
 
@@ -143,7 +141,7 @@ namespace NDepCheck.Tests {
 
         private void WriteDep2To(string directory) {
             Write(directory, "NDepCheck.TestAssemblyÄÖÜß.dll.dep",
-                @"$ DOTNETCALL ---> DOTNETCALL
+                @"$ DOTNETITEM ---> DOTNETITEM
                   NDepCheck.TestAssemblyÄÖÜß.** ---> **
 
                   $ DOTNETREF ---> DOTNETREF
@@ -155,7 +153,7 @@ namespace NDepCheck.Tests {
             Write(directory, "NDepCheck.TestAssemblyÄÖÜß.dll.dep", @"+ Dep2Include\Dep2A.dep");
             Write(directory + @"\Dep2Include", "Dep2A.dep", @"+ ..\Dep2B.dep");
             Write(directory, "Dep2B.dep",
-                @"$ DOTNETCALL ---> DOTNETCALL
+                @"$ DOTNETITEM ---> DOTNETITEM
 
                 NDepCheck.TestAssemblyÄÖÜß.** ---> **
                 ASSEMBLY.NAME=** ---> ASSEMBLY.NAME=**");
@@ -163,7 +161,7 @@ namespace NDepCheck.Tests {
 
         private void WriteDefaultSetTo(string directory) {
             Write(directory, "Defaults.dep", @"
-                $ DOTNETCALL ---> DOTNETCALL
+                $ DOTNETITEM ---> DOTNETITEM
                 ** ---? **
 
                 $ DOTNETREF ---> DOTNETREF

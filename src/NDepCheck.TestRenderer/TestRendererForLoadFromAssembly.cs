@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using NDepCheck.ConstraintSolving;
-using NDepCheck.Rendering;
+using NDepCheck.Rendering.GraphicsRendering;
 
 namespace NDepCheck.TestRenderer {
     public class TestRendererForLoadFromAssembly : GraphicsRenderer {
@@ -42,7 +42,7 @@ namespace NDepCheck.TestRenderer {
             ItemType simple = ItemType.New("SIMPLE(Name)");
             Item[] localItems = Enumerable.Range(0, 5).Select(i => Item.New(simple, "Item " + i)).ToArray();
             return localItems.SelectMany(
-                    (from, i) => localItems.Skip(i).Select(to => new Dependency(from, to, new TextFileSource("Test", i), "Test", ct: 10 * i))).ToArray();
+                    (from, i) => localItems.Skip(i).Select(to => new Dependency(from, to, new TextFileSourceLocation("Test", i), "Test", ct: 10 * i))).ToArray();
         }
 
         public override string GetHelp(bool detailedHelp, string filter) {

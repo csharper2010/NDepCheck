@@ -1,10 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using JetBrains.Annotations;
 
 namespace NDepCheck.Transforming.Modifying {
-    public class ModifyItems : AbstractTransformerWithConfigurationPerInputfile<IEnumerable<ItemAction>> {
+    public class ModifyItems : AbstractTransformerWithFileConfiguration<IEnumerable<ItemAction>> {
         public static readonly Option ModificationsFileOption = new Option("mf", "modifications-file", "filename", "File containing modifications", @default: "");
         public static readonly Option ModificationsOption = new Option("ml", "modifications-list", "modifications", "Inline modifications", orElse: ModificationsFileOption);
 
@@ -60,8 +61,6 @@ Examples:
             return result;
         }
 
-        public override bool RunsPerInputContext => false;
-
         private IEnumerable<ItemAction> _orderedActions;
 
         public override void Configure([NotNull] GlobalContext globalContext, [CanBeNull] string configureOptions, bool forceReload) {
@@ -76,7 +75,7 @@ Examples:
                 }),
                 ModificationsOption.Action((args, j) => {
                     _orderedActions = GetOrReadChildConfiguration(globalContext,
-                        () => new StringReader(string.Join("\r\n", args.Skip(j + 1))),
+                        () => new StringReader(string.Join(Environment.NewLine, args.Skip(j + 1))),
                         ModificationsOption.ShortName, globalContext.IgnoreCase, "????", forceReload: true);
                     // ... and all args are read in, so the next arg index is past every argument.
                     return int.MaxValue;
@@ -84,7 +83,7 @@ Examples:
             );
         }
 
-        protected override IEnumerable<ItemAction> CreateConfigurationFromText(GlobalContext globalContext, string fullConfigFileName, 
+        protected override IEnumerable<ItemAction> CreateConfigurationFromText([NotNull] GlobalContext globalContext, string fullConfigFileName, 
             int startLineNo, TextReader tr, bool ignoreCase, string fileIncludeStack, bool forceReloadConfiguration, 
             Dictionary<string, string> configValueCollector) {
 
@@ -98,24 +97,24 @@ Examples:
             return actions;
         }
 
-        public override int Transform(GlobalContext globalContext, [CanBeNull] string dependenciesFilename, IEnumerable<Dependency> dependencies,
-            string transformOptions, string dependencySourceForLogging, List<Dependency> transformedDependencies) {
+        public override int Transform([NotNull] GlobalContext globalContext, [NotNull, ItemNotNull] IEnumerable<Dependency> dependencies,
+            string transformOptions, [NotNull] List<Dependency> transformedDependencies) {
 
             if (_orderedActions == null) {
                 Log.WriteWarning($"No actions configured for {GetType().Name}");
             } else {
 
-                Dictionary<Item, IEnumerable<Dependency>> items2incoming =
+                Dictionary<Item, Dependency[]> items2incoming =
                     Item.CollectIncomingDependenciesMap(dependencies);
-                Dictionary<Item, IEnumerable<Dependency>> items2outgoing =
+                Dictionary<Item, Dependency[]> items2outgoing =
                     Item.CollectOutgoingDependenciesMap(dependencies);
 
                 var allItems = new HashSet<Item>(items2incoming.Keys.Concat(items2outgoing.Keys));
 
                 foreach (var i in allItems.ToArray()) {
-                    IEnumerable<Dependency> incoming;
+                    Dependency[] incoming;
                     items2incoming.TryGetValue(i, out incoming);
-                    IEnumerable<Dependency> outgoing;
+                    Dependency[] outgoing;
                     items2outgoing.TryGetValue(i, out outgoing);
 
                     ItemAction firstMatchingAction = _orderedActions.FirstOrDefault(a => a.Matches(incoming, i, outgoing));
@@ -135,7 +134,7 @@ Examples:
             return Program.OK_RESULT;
         }
 
-        public override IEnumerable<Dependency> GetTestDependencies() {
+        public override IEnumerable<Dependency> CreateSomeTestDependencies() {
             var a = Item.New(ItemType.SIMPLE, "A");
             var b = Item.New(ItemType.SIMPLE, "B");
             return new[] {

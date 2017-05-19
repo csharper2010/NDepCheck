@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
+using NDepCheck.Matching;
 
 namespace NDepCheck.Transforming.SpecialDependencyMarking {
     public class MarkMinimalCutDeps : ITransformer {
@@ -26,18 +27,16 @@ Configuration options: None
 Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)}";
         }
 
-        public bool RunsPerInputContext => true;
-
-        public void Configure(GlobalContext globalContext, string configureOptions) {
+        public void Configure([NotNull] GlobalContext globalContext, [CanBeNull] string configureOptions) {
             _ignoreCase = globalContext.IgnoreCase;
         }
 
-        private class Edge {
+        private class EdgeWithFlow {
             public readonly Dependency Dependency;
             public readonly int Capacity;
             public int Flow;
 
-            public Edge(Dependency dependency, Func<Dependency, int> capacity) {
+            public EdgeWithFlow(Dependency dependency, Func<Dependency, int> capacity) {
                 Dependency = dependency;
                 Capacity = capacity(dependency);
                 Flow = 0;
@@ -50,17 +49,16 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
             public bool ReverseInResidual => Flow > 0;
         }
 
-        public void Configure(GlobalContext globalContext, string configureOptions, bool forceReload) {
+        public void Configure([NotNull] GlobalContext globalContext, [CanBeNull] string configureOptions, bool forceReload) {
             _ignoreCase = globalContext.IgnoreCase;
         }
 
-        public int Transform(GlobalContext globalContext, [CanBeNull] string dependenciesFilename, IEnumerable<Dependency> dependencies,
-            string transformOptions, string dependencySourceForLogging, List<Dependency> transformedDependencies) {
+        public int Transform([NotNull] GlobalContext globalContext, [NotNull, ItemNotNull] IEnumerable<Dependency> dependencies,
+            string transformOptions, [NotNull] List<Dependency> transformedDependencies) {
 
             var sourceMatches = new List<ItemMatch>();
             var targetMatches = new List<ItemMatch>();
             string markerToAddToSourceSide = null;
-            //string markerToAddToTargetSide = null;
             string markerToAddToCut = null;
             Func<Dependency, int> weightForCut = d => d.BadCt;
 
@@ -91,8 +89,8 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
                 }));
 
             var items = new HashSet<Item>(dependencies.SelectMany(d => new[] { d.UsingItem, d.UsedItem }));
-            var sourceItems = new List<Item>(items.Where(i => sourceMatches.Any(m => m.Matches(i) != null)));
-            var targetItems = new HashSet<Item>(items.Where(i => targetMatches.Any(m => m.Matches(i) != null)));
+            var sourceItems = new List<Item>(items.Where(i => sourceMatches.Any(m => m.Matches(i).Success)));
+            var targetItems = new HashSet<Item>(items.Where(i => targetMatches.Any(m => m.Matches(i).Success)));
             if (!sourceItems.Any()) {
                 throw new ApplicationException("No source items found - minimal cut cannot be computed");
             } else if (!targetItems.Any()) {
@@ -109,12 +107,12 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
 
             // Find maximal flow from sources to targets via the Ford-Fulkerson algorithm - see e.g. 
             // http://www.cs.princeton.edu/courses/archive/spr04/cos226/lectures/maxflow.4up.pdf;
-            Dictionary<Dependency, Edge> edges = dependencies.ToDictionary(d => d, d => new Edge(d, weightForCut));
+            Dictionary<Dependency, EdgeWithFlow> edges = dependencies.ToDictionary(d => d, d => new EdgeWithFlow(d, weightForCut));
 
-            Dictionary<Item, List<Edge>> outgoing = Item.CollectMap(dependencies, d => d.UsingItem, d => edges[d]);
+            Dictionary<Item, List<EdgeWithFlow>> outgoing = Item.CollectMap(dependencies, d => d.UsingItem, d => edges[d]);
             SortByFallingCapacity(outgoing);
 
-            Dictionary<Item, List<Edge>> incoming = Item.CollectMap(dependencies, d => d.UsedItem, d => edges[d]);
+            Dictionary<Item, List<EdgeWithFlow>> incoming = Item.CollectMap(dependencies, d => d.UsedItem, d => edges[d]);
             SortByFallingCapacity(incoming);
 
             bool flowIncreased;
@@ -135,10 +133,10 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
             // Find minimal cut and add markers
             foreach (var s in reachableFromSources) {
                 if (markerToAddToSourceSide != null) {
-                    s.AddMarker(markerToAddToSourceSide);
+                    s.IncrementMarker(markerToAddToSourceSide);
                 }
                 foreach (var d in GetList(outgoing, s).Where(e => !reachableFromSources.Contains(e.UsedItem))) {
-                    d.Dependency.AddMarker(markerToAddToCut);
+                    d.Dependency.IncrementMarker(markerToAddToCut);
                 }
             }
 
@@ -147,20 +145,20 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
             return Program.OK_RESULT;
         }
 
-        private static void SortByFallingCapacity(Dictionary<Item, List<Edge>> e) {
+        private static void SortByFallingCapacity(Dictionary<Item, List<EdgeWithFlow>> e) {
             foreach (var li in e.Values) {
                 li.Sort((e1, e2) => e2.Capacity - e1.Capacity);
             }
         }
 
-        private static IEnumerable<Edge> GetList(Dictionary<Item, List<Edge>> dictionary, Item item) {
-            List<Edge> result;
+        private static IEnumerable<EdgeWithFlow> GetList(Dictionary<Item, List<EdgeWithFlow>> dictionary, Item item) {
+            List<EdgeWithFlow> result;
             dictionary.TryGetValue(item, out result);
-            return result ?? Enumerable.Empty<Edge>();
+            return result ?? Enumerable.Empty<EdgeWithFlow>();
         }
 
         private int IncreaseFlow(Item item, int maxPossibleFlowIncreaseAlongPath, HashSet<Item> visited,
-            Dictionary<Item, List<Edge>> outgoing, Dictionary<Item, List<Edge>> incoming, HashSet<Item> targetItems) {
+            Dictionary<Item, List<EdgeWithFlow>> outgoing, Dictionary<Item, List<EdgeWithFlow>> incoming, HashSet<Item> targetItems) {
             if (targetItems.Contains(item)) {
                 return maxPossibleFlowIncreaseAlongPath;
             } else {
@@ -188,8 +186,8 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
             }
         }
 
-        private int ComputeActualIncrease(HashSet<Item> visited, Dictionary<Item, List<Edge>> outgoing,
-            Dictionary<Item, List<Edge>> incoming, HashSet<Item> targetItems, int possibleFlowIncrease, Item nextItem) {
+        private int ComputeActualIncrease(HashSet<Item> visited, Dictionary<Item, List<EdgeWithFlow>> outgoing,
+            Dictionary<Item, List<EdgeWithFlow>> incoming, HashSet<Item> targetItems, int possibleFlowIncrease, Item nextItem) {
             if (possibleFlowIncrease > 0 && visited.Add(nextItem)) {
                 int result = IncreaseFlow(nextItem, possibleFlowIncrease, visited, outgoing, incoming, targetItems);
                 visited.Remove(nextItem);
@@ -200,7 +198,7 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
         }
 
         private void AddReachableInResidualGraph(Item item, HashSet<Item> reachableFromSources,
-            Dictionary<Item, List<Edge>> outgoing, Dictionary<Item, List<Edge>> incoming) {
+            Dictionary<Item, List<EdgeWithFlow>> outgoing, Dictionary<Item, List<EdgeWithFlow>> incoming) {
             foreach (var e in GetList(outgoing, item).Where(e => e.InResidual)) {
                 if (reachableFromSources.Add(e.UsedItem)) {
                     AddReachableInResidualGraph(e.UsedItem, reachableFromSources, outgoing, incoming);
@@ -213,7 +211,7 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
             }
         }
 
-        public IEnumerable<Dependency> GetTestDependencies() {
+        public IEnumerable<Dependency> CreateSomeTestDependencies() {
             // Graph from http://web.stanford.edu/class/cs97si/08-network-flow-problems.pdf p.7
             Item s = Item.New(ItemType.SIMPLE, "s");
             Item a = Item.New(ItemType.SIMPLE, "a");
@@ -222,21 +220,17 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
             Item d = Item.New(ItemType.SIMPLE, "d");
             Item t = Item.New(ItemType.SIMPLE, "t");
             return new[] {
-                new Dependency(s, a, null, "s->a", 101, 16, 0),
-                new Dependency(s, c, null, "s->c", 103, 13, 0),
-                new Dependency(a, b, null, "a->b", 112, 12, 0),
-                new Dependency(a, c, null, "a->c", 113, 10, 0),
-                new Dependency(b, c, null, "b->c", 123, 9, 0),
-                new Dependency(b, t, null, "b->t", 125, 20, 0),
-                new Dependency(c, a, null, "c->a", 131, 4, 0),
-                new Dependency(c, d, null, "c->d", 134, 14, 0),
-                new Dependency(d, b, null, "d->b", 142, 7, 0),
-                new Dependency(d, t, null, "d->t", 145, 4, 0),
+                new Dependency(s, a, null, "s_a", 101, 16, 0),
+                new Dependency(s, c, null, "s_c", 103, 13, 0),
+                new Dependency(a, b, null, "a_b", 112, 12, 0),
+                new Dependency(a, c, null, "a_c", 113, 10, 0),
+                new Dependency(b, c, null, "b_c", 123, 9, 0),
+                new Dependency(b, t, null, "b_t", 125, 20, 0),
+                new Dependency(c, a, null, "c_a", 131, 4, 0),
+                new Dependency(c, d, null, "c_d", 134, 14, 0),
+                new Dependency(d, b, null, "d_b", 142, 7, 0),
+                new Dependency(d, t, null, "d_t", 145, 4, 0),
             };
-        }
-
-        public void AfterAllTransforms(GlobalContext globalContext) {
-            // empty
         }
     }
 }

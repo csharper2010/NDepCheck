@@ -92,58 +92,82 @@
       <Link>CommonAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="AbstractLogger.cs" />
+    <Compile Include="AbstractDepthFirstPathTraverser.cs" />
     <Compile Include="Annotations.cs" />
     <Compile Include="Calculating\GetHash.cs" />
-    <Compile Include="Calculating\ICalculator.cs" />
+    <Compile Include="AbstractSourceLocation.cs" />
+    <Compile Include="ICalculator.cs" />
     <Compile Include="ConstraintSolving\Range.cs" />
     <Compile Include="ConstraintSolving\SimpleConstraintSolver.cs" />
     <Compile Include="FileWatcher.cs" />
-    <Compile Include="MarkerPattern.cs" />
-    <Compile Include="ObjectWithMarkers.cs" />
-    <Compile Include="Reading\DipReaderFactory.cs" />
+    <Compile Include="Ignore.cs" />
+    <Compile Include="IMatchableObject.cs" />
+    <Compile Include="IPathMatch.cs" />
+    <Compile Include="ISourceLocation.cs" />
+    <Compile Include="LocalSourceLocation.cs" />
+    <Compile Include="Log.cs" />
+    <Compile Include="DictionaryExtensions.cs" />
+    <Compile Include="Markers\IWithMarkerSet.cs" />
+    <Compile Include="Matching\CountPattern.cs" />
+    <Compile Include="Matching\MarkerMatch.cs" />
+    <Compile Include="Markers\AbstractMarkerSet.cs" />
+    <Compile Include="Markers\IMarkerSet.cs" />
+    <Compile Include="Markers\IMutableMarkerSet.cs" />
+    <Compile Include="Markers\ReadOnlyMarkerSet.cs" />
+    <Compile Include="Matching\Pattern.cs" />
+    <Compile Include="Markers\MutableMarkerSet.cs" />
+    <Compile Include="ProgramFileSource.cs" />
+    <Compile Include="Reading\AbstractReaderFactory.cs" />
+    <Compile Include="Reading\DipReading\DipReaderFactory.cs" />
     <Compile Include="IPlugin.cs" />
-    <Compile Include="Rendering\ItemWriter.cs" />
-    <Compile Include="SourceLocation.cs" />
-    <Compile Include="Rendering\RuleViolationRenderer.cs" />
-    <Compile Include="Rendering\MatrixGraphicsRenderer.cs" />
-    <Compile Include="Rendering\ModulesAndInterfacesRenderer.cs" />
-    <Compile Include="Rendering\AbstractGenericMatrixRenderer.cs" />
+    <Compile Include="IReaderFactory.cs" />
+    <Compile Include="Reading\AssemblyReading\DotNetAssemblyDependencyReaderFactory.cs" />
+    <Compile Include="Rendering\TextWriting\FlatPathWriter.cs" />
+    <Compile Include="Rendering\TextWriting\OldPathWriter.cs" />
+    <Compile Include="Rendering\TextWriting\ItemWriter.cs" />
+    <Compile Include="Rendering\OrderSupport.cs" />
+    <Compile Include="TextFileSource.cs" />
+    <Compile Include="Rendering\TextWriting\RuleViolationWriter.cs" />
+    <Compile Include="Rendering\GraphicsRendering\MatrixGraphicsRenderer.cs" />
+    <Compile Include="Rendering\GraphicsRendering\ModulesAndInterfacesRenderer.cs" />
+    <Compile Include="Rendering\GraphicsRendering\AbstractGenericMatrixRenderer.cs" />
     <Compile Include="ConstraintSolving\Constraints.cs" />
     <Compile Include="ConstraintSolving\NumericVariable.cs" />
-    <Compile Include="Rendering\MatrixRenderer2.cs" />
-    <Compile Include="Rendering\IRenderer.cs" />
-    <Compile Include="Rendering\MatrixRenderer1.cs" />
-    <Compile Include="Rendering\DotRenderer.cs" />
-    <Compile Include="Reading\FullDotNetAssemblyDependencyReader.cs" />
+    <Compile Include="Rendering\GraphicsRendering\MatrixRenderer2.cs" />
+    <Compile Include="IRenderer.cs" />
+    <Compile Include="Rendering\GraphicsRendering\MatrixRenderer1.cs" />
+    <Compile Include="Rendering\TextWriting\DotRenderer.cs" />
+    <Compile Include="Reading\AssemblyReading\FullDotNetAssemblyDependencyReader.cs" />
     <Compile Include="Gibraltar\StringReference.cs" />
-    <Compile Include="Transforming\CycleChecking\FindCycleDeps.cs" />
+    <Compile Include="Transforming\AbstractTransformerWithFileConfiguration.cs" />
+    <Compile Include="Transforming\PathFinding\PathSupport.cs" />
+    <Compile Include="Transforming\PathFinding\MarkCycleDeps.cs" />
     <Compile Include="Transforming\DependencyCreating\AddTransitiveDeps.cs" />
-    <Compile Include="Transforming\DependencyPattern.cs" />
+    <Compile Include="Matching\DependencyPattern.cs" />
+    <Compile Include="Transforming\DependencyEffectOptions.cs" />
     <Compile Include="Transforming\EffectOptions.cs" />
     <Compile Include="Transforming\ExtendedDependencyEffectOptions.cs" />
-    <Compile Include="Transforming\ItemMatch.cs" />
-    <Compile Include="Transforming\DependencyMatch.cs" />
-    <Compile Include="Transforming\DependencyMatchOptions.cs" />
+    <Compile Include="Matching\ItemMatch.cs" />
+    <Compile Include="Matching\DependencyMatch.cs" />
+    <Compile Include="Matching\DependencyMatchOptions.cs" />
+    <Compile Include="Transforming\ItemEffectOptions.cs" />
     <Compile Include="Transforming\Modifying\KeepOnlyDeps.cs" />
     <Compile Include="Transforming\Modifying\MarkDeps.cs" />
+    <Compile Include="Matching\Matchers.cs" />
+    <Compile Include="Transforming\PathFinding\PathMarker.cs" />
     <Compile Include="Transforming\Projecting\ProjectItems.AbstractProjector.cs" />
     <Compile Include="Transforming\Projecting\ProjectItems.SelfOptimizingFirstLetterProjector.cs" />
     <Compile Include="Transforming\Projecting\ProjectItems.AbstractSelfOptimizingProjector.cs" />
     <Compile Include="Transforming\SpecialDependencyMarking\MarkMinimalCut.cs" />
     <Compile Include="Transforming\SpecialDependencyMarking\MarkSpecialDeps.cs" />
-    <Compile Include="Transforming\SpecialNodeMarking\MarkSpecialItems .cs" />
+    <Compile Include="Transforming\SpecialItemMarking\MarkSpecialItems .cs" />
     <Compile Include="Transforming\Modifying\ItemAction.cs" />
     <Compile Include="Transforming\Modifying\ModifyItems.cs" />
     <Compile Include="Transforming\DependencyCreating\AddReverseDeps.cs" />
-    <Compile Include="Transforming\GraphTransformations\HideOuterGraph.cs" />
-    <Compile Include="Transforming\GraphTransformations\AssociativeHull.cs" />
-    <Compile Include="Reading\AbstractDotNetAssemblyDependencyReader.cs" />
-    <Compile Include="InputContext.cs" />
-    <Compile Include="InputOption.cs" />
+    <Compile Include="Reading\AssemblyReading\AbstractDotNetAssemblyDependencyReader.cs" />
     <Compile Include="GlobalContext.cs" />
-    <Compile Include="DependencyHelper..cs" />
     <Compile Include="Reading\AbstractDependencyReader.cs" />
-    <Compile Include="Transforming\IMatcher.cs" />
+    <Compile Include="Matching\IMatcher.cs" />
     <Compile Include="Transforming\Ordering\AddItemOrder.cs" />
     <Compile Include="Transforming\MatrixDictionary.cs" />
     <Compile Include="Transforming\Projecting\IProjectionSetElement.cs" />
@@ -154,40 +178,40 @@
     <Compile Include="Transforming\ViolationChecking\DependencyRuleSet.cs" />
     <Compile Include="Transforming\ViolationChecking\DependencyRule.cs" />
     <Compile Include="Dependency.cs" />
-    <Compile Include="Transforming\ViolationChecking\DependencyRuleRepresentation.cs" />
+    <Compile Include="Transforming\ViolationChecking\DependencyRuleSource.cs" />
     <Compile Include="ConsoleLogger.cs" />
-    <Compile Include="Reading\DipReader.cs" />
-    <Compile Include="Rendering\DipWriter.cs" />
+    <Compile Include="Reading\DipReading\DipReader.cs" />
+    <Compile Include="Rendering\TextWriting\DipWriter.cs" />
     <Compile Include="Transforming\Projecting\Projection.cs" />
     <Compile Include="IWithCt.cs" />
-    <Compile Include="INode.cs" />
     <Compile Include="Item.cs" />
-    <Compile Include="Reading\ItemsOnlyDotNetAssemblyDependencyReader.cs" />
+    <Compile Include="Reading\AssemblyReading\ItemsOnlyDotNetAssemblyDependencyReader.cs" />
     <Compile Include="ItemType.cs" />
-    <Compile Include="Transforming\ItemPattern.cs" />
+    <Compile Include="Matching\ItemPattern.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="ILogger.cs" />
     <Compile Include="Option.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Rendering\SomeRendererTestData.cs" />
+    <Compile Include="Rendering\RendererSupport.cs" />
     <Compile Include="ConstraintSolving\VariableVector.cs" />
-    <Compile Include="Rendering\VectorF.cs" />
-    <Compile Include="Rendering\GraphicsRenderer.cs" />
+    <Compile Include="Rendering\GraphicsRendering\VectorF.cs" />
+    <Compile Include="Rendering\GraphicsRendering\GraphicsRenderer.cs" />
     <Compile Include="Transforming\AbstractTransformerWithConfigurationPerInputfile.cs" />
     <Compile Include="Transforming\FromTo.cs" />
-    <Compile Include="Transforming\ITransformer.cs" />
+    <Compile Include="ITransformer.cs" />
     <Compile Include="Transforming\Projecting\ProjectItems.cs" />
     <Compile Include="Transforming\ViolationChecking\CheckDeps.cs" />
     <Compile Include="ValuesFrame.cs" />
     <Compile Include="WebServing\WebServer.cs" />
     <Compile Include="WebServing\StringBuilderLogger.cs" />
+    <Compile Include="WriteTarget.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config">
       <SubType>Designer</SubType>
     </None>
     <None Include="EverythingAllowed.dep" />
-    <None Include="NDepCheck.cd" />
+    <None Include="NDepCheck.nd" />
     <None Include="packages.config" />
     <Compile Include="Transforming\Projecting\ProjectItems.SelfOptimizingPrefixTrieProjector.cs" />
   </ItemGroup>
@@ -222,6 +246,9 @@
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Import Project="..\packages\CreateAssemblyInfoFromGit.1.0.0-beta0025\build\CreateAssemblyInfoFromGit.targets" Condition="Exists('..\packages\CreateAssemblyInfoFromGit.1.0.0-beta0025\build\CreateAssemblyInfoFromGit.targets')" />
+  <PropertyGroup>
+    <PostBuildEvent>$(TargetPath) -rd $(TargetPath) -ds $(ProjectDir)NDepCheck.nd</PostBuildEvent>
+  </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

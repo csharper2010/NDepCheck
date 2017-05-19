@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -143,7 +142,7 @@ namespace NDepCheck.WebServing {
         }
 
         private string WrapAsHtmlBody(string s) {
-            return $@"<!DOCTYPE HTML><html><body>{s.Replace("\r\n", "<br>\r\n")}</body></html>";
+            return $@"<!DOCTYPE HTML><html><body>{s.Replace(Environment.NewLine, "<br>" + Environment.NewLine)}</body></html>";
         }
     }
 }

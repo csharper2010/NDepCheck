@@ -2,10 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
+using NDepCheck.Matching;
 
 namespace NDepCheck.Transforming.SpecialDependencyMarking {
     public class MarkSpecialDeps : ITransformer {
-        public static readonly DependencyMatchOptions DependencyMatchOptions = new DependencyMatchOptions();
+        public static readonly DependencyMatchOptions DependencyMatchOptions = new DependencyMatchOptions("mark");
 
         public static readonly Option AddMarkerOption = new Option("am", "add-marker", "&", "Marker added to identified items", @default: null);
         //public static readonly Option RecursiveMarkOption = new Option("mr", "mark-recursively", "", "Repeat marking", @default: false);
@@ -26,14 +27,12 @@ Configuration options: None
 Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)}";
         }
 
-        public bool RunsPerInputContext => true;
-
-        public void Configure(GlobalContext globalContext, string configureOptions, bool forceReload) {
+        public void Configure([NotNull] GlobalContext globalContext, [CanBeNull] string configureOptions, bool forceReload) {
             _ignoreCase = globalContext.IgnoreCase;
         }
 
-        public int Transform(GlobalContext globalContext, string dependenciesFilename, IEnumerable<Dependency> dependencies,
-            [CanBeNull] string transformOptions, string dependencySourceForLogging, List<Dependency> transformedDependencies) {
+        public int Transform([NotNull] GlobalContext globalContext, [NotNull, ItemNotNull] IEnumerable<Dependency> dependencies,
+            [CanBeNull] string transformOptions, [NotNull] List<Dependency> transformedDependencies) {
 
             var matches = new List<DependencyMatch>();
             var excludes = new List<DependencyMatch>();
@@ -64,13 +63,13 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
             if (markSingleCycleNodes) {
                 foreach (var d in matchingDependencies) {
                     if (Equals(d.UsingItem, d.UsedItem)) {
-                        d.AddMarker(markerToAdd);
+                        d.IncrementMarker(markerToAdd);
                     }
                 }
             }
 
             if (markTransitiveDependencies) {
-                Dictionary<Item, IEnumerable<Dependency>> outgoing = Item.CollectOutgoingDependenciesMap(matchingDependencies);
+                Dictionary<Item, Dependency[]> outgoing = Item.CollectOutgoingDependenciesMap(matchingDependencies);
                 foreach (var root in outgoing.Keys) {
                     var itemsAtDistance1FromRoot = new Dictionary<Item, List<Dependency>>();
                     foreach (var d in outgoing[root]) {
@@ -97,13 +96,13 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
             return Program.OK_RESULT;
         }
 
-        private void RemoveReachableItems(Item itemAtDistanceNFromRoot, HashSet<Item> visited, Dictionary<Item, IEnumerable<Dependency>> outgoing,
+        private void RemoveReachableItems(Item itemAtDistanceNFromRoot, HashSet<Item> visited, Dictionary<Item, Dependency[]> outgoing,
             Dictionary<Item, List<Dependency>> itemsAtDistance1FromRoot, string markerToAdd) {
             if (!visited.Contains(itemAtDistanceNFromRoot)) {
                 visited.Add(itemAtDistanceNFromRoot);
                 if (itemsAtDistance1FromRoot.ContainsKey(itemAtDistanceNFromRoot)) {
                     foreach (var d in itemsAtDistance1FromRoot[itemAtDistanceNFromRoot]) {
-                        d.AddMarker(markerToAdd);
+                        d.IncrementMarker(markerToAdd);
                     }
                     // This item can be "reached transitively" - we are done with it.
                     itemsAtDistance1FromRoot.Remove(itemAtDistanceNFromRoot);
@@ -117,11 +116,7 @@ Transformer options: {Option.CreateHelp(_transformOptions, detailedHelp, filter)
             }
         }
 
-        public void AfterAllTransforms(GlobalContext globalContext) {
-            // empty
-        }
-
-        public IEnumerable<Dependency> GetTestDependencies() {
+        public IEnumerable<Dependency> CreateSomeTestDependencies() {
             Item a = Item.New(ItemType.SIMPLE, "Ax");
             Item b = Item.New(ItemType.SIMPLE, "Bx");
             Item c = Item.New(ItemType.SIMPLE, "Cloop");

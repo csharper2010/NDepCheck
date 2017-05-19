@@ -5,6 +5,7 @@ using JetBrains.Annotations;
 
 namespace NDepCheck.Transforming.Ordering {
     public class AddItemOrder : ITransformer {
+        public static readonly Option AddMarkerOption = new Option("am", "add-marker", "&", "Marker prefix for order markers", @default: "#");
         public static readonly Option OrderByQuestionableCount = new Option("oq", "order-by-questionable", "", "Order by sum of questionable counts", @default: "Order by count");
         public static readonly Option OrderByBadCount = new Option("ob", "order-by-bad", "", "Order by sum of bad counts", @default: "Order by count");
         public static readonly Option OrderByIncomingValues = new Option("oi", "order-by-incoming", "", "Order by incoming values", @default: "Order by ratio incoming/(incoming+outgoing)");
@@ -20,17 +21,16 @@ Configure options: None
 Transform options: {Option.CreateHelp(_allOptions, detailedHelp, filter)}";
         }
 
-        public bool RunsPerInputContext => false;
-
-        public void Configure(GlobalContext globalContext, string configureOptions, bool forceReload) {
+        public void Configure([NotNull] GlobalContext globalContext, [CanBeNull] string configureOptions, bool forceReload) {
             // empty
         }
 
-        public int Transform(GlobalContext globalContext, [CanBeNull] string dependenciesFilename, IEnumerable<Dependency> dependencies,
-            [CanBeNull] string transformOptions, string dependencySourceForLogging, List<Dependency> transformedDependencies) {
+        public int Transform([NotNull] GlobalContext globalContext, [NotNull, ItemNotNull] IEnumerable<Dependency> dependencies,
+            [CanBeNull] string transformOptions, [NotNull] List<Dependency> transformedDependencies) {
 
             Func<int, int, decimal> getSortValue = (incoming, outgoing) => incoming / (incoming + outgoing + 0.0001m);
             Func<Dependency, int> orderBy = d => d.Ct;
+            string orderMarkerPrefix = "_";
 
             Option.Parse(globalContext, transformOptions,
                 OrderByBadCount.Action((args, j) => {
@@ -47,6 +47,9 @@ Transform options: {Option.CreateHelp(_allOptions, detailedHelp, filter)}";
                 }),
                 OrderByOutgoingValues.Action((args, j) => {
                     getSortValue = (incoming, outgoing) => outgoing;
+                    return j;
+                }), AddMarkerOption.Action((args, j) => {
+                    orderMarkerPrefix = Option.ExtractRequiredOptionValue(args, ref j, "missing marker prefix").Trim('\'').Trim();
                     return j;
                 }));
 
@@ -74,16 +77,12 @@ Transform options: {Option.CreateHelp(_allOptions, detailedHelp, filter)}";
 
                 aggregatedCounts.RemoveColumn(minItem);
 
-                minItem.SetOrder(i.ToString("D4"));
+                minItem.IncrementMarker(orderMarkerPrefix + i.ToString("D4"));
             }
             return Program.OK_RESULT;
         }
 
-        public void AfterAllTransforms(GlobalContext globalContext) {
-            // empty
-        }
-
-        public IEnumerable<Dependency> GetTestDependencies() {
+        public IEnumerable<Dependency> CreateSomeTestDependencies() {
             var a = Item.New(ItemType.SIMPLE, "A");
             var b = Item.New(ItemType.SIMPLE, "B");
             var c = Item.New(ItemType.SIMPLE, "C");

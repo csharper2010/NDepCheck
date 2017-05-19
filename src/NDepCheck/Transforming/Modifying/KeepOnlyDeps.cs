@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
+using JetBrains.Annotations;
+using NDepCheck.Matching;
 
 namespace NDepCheck.Transforming.Modifying {
     public class KeepOnlyDeps : ITransformer {
-        private static readonly DependencyMatchOptions DependencyMatchOptions = new DependencyMatchOptions();
+        private static readonly DependencyMatchOptions DependencyMatchOptions = new DependencyMatchOptions("keep");
 
         private bool _ignoreCase;
 
@@ -15,15 +17,13 @@ Configuration options: None
 Transformer options: {Option.CreateHelp(DependencyMatchOptions.WithOptions(), detailedHelp, filter)}";
         }
 
-        public bool RunsPerInputContext => true;
-
-        public void Configure(GlobalContext globalContext, string configureOptions, bool forceReload) {
+        public void Configure([NotNull] GlobalContext globalContext, [CanBeNull] string configureOptions, bool forceReload) {
             _ignoreCase = globalContext.IgnoreCase;
         }
 
-        public int Transform(GlobalContext globalContext, string dependenciesFilename,
-            IEnumerable<Dependency> dependencies, string transformOptions, string dependencySourceForLogging,
-            List<Dependency> transformedDependencies) {
+        public int Transform([NotNull] GlobalContext globalContext,
+            [NotNull, ItemNotNull] IEnumerable<Dependency> dependencies, string transformOptions,
+            [NotNull] List<Dependency> transformedDependencies) {
 
             var matches = new List<DependencyMatch>();
             var excludes = new List<DependencyMatch>();
@@ -35,11 +35,7 @@ Transformer options: {Option.CreateHelp(DependencyMatchOptions.WithOptions(), de
             return Program.OK_RESULT;
         }
 
-        public void AfterAllTransforms(GlobalContext globalContext) {
-            // empty
-        }
-
-        public IEnumerable<Dependency> GetTestDependencies() {
+        public IEnumerable<Dependency> CreateSomeTestDependencies() {
             Item a = Item.New(ItemType.SIMPLE, "A");
             Item b = Item.New(ItemType.SIMPLE, "B");
             return new[] {

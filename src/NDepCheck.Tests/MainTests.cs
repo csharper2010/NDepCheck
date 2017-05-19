@@ -1,11 +1,10 @@
-// (c) HMMüller 2006...2017
-
 using System;
 using System.IO;
 using System.Linq;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NDepCheck.Rendering;
+using NDepCheck.Rendering.GraphicsRendering;
+using NDepCheck.Rendering.TextWriting;
 using NDepCheck.TestRenderer;
 using NDepCheck.Transforming.Modifying;
 using NDepCheck.Transforming.Projecting;
@@ -32,12 +31,12 @@ namespace NDepCheck.Tests {
 
         [TestMethod]
         public void GeneralSucceedingTest() {
-            using (var ruleFile = new TempFileProvider(CreateTempDotNetDepFileName())) {
+            using (var ruleFile = DisposingFile.CreateTempFileWithTail(".dll.dep")) {
                 using (TextWriter tw = new StreamWriter(ruleFile.Filename, false, Encoding.Default)) {
                     tw.Write(@"
 // Test dependencies for NDepCheck
 
-$ DOTNETCALL ---> DOTNETCALL
+$ DOTNETITEM ---> DOTNETITEM
                   
     // Every class may use all classes from its own namespace.
 (**): ---> \1:
@@ -128,6 +127,7 @@ NDepCheck:Tests ---> **
                     Console.SetOut(tw);
                     string[] args = {
                         Program.LogVerboseOption.Opt,
+                        Program.ConfigureOption.Opt,
                         typeof(CheckDeps).Name, "<.",
                             CheckDeps.DefaultRuleFileOption.Opt, ruleFile.Filename,
                         ".>",
@@ -220,10 +220,10 @@ NDepCheck:Tests ---> **
 
         [TestMethod]
         public void ExitOk() {
-            using (var d = new TempFileProvider(CreateTempDotNetDepFileName())) {
+            using (var d = DisposingFile.CreateTempFileWithTail(".dll.dep")) {
                 using (TextWriter tw = new StreamWriter(d.Filename)) {
                     tw.Write(@"
-                    $ DOTNETCALL ---> DOTNETCALL
+                    $ DOTNETITEM ---> DOTNETITEM
                   
                     NDepCheck.TestAssembly.** ---> NDepCheck.TestAssembly.**
                     NDepCheck.TestAssembly.**::NDepCheck.TestAssembly ---> System.**::mscorlib
@@ -239,30 +239,28 @@ NDepCheck:Tests ---> **
             }
         }
 
-        private static string[] CreateCheckDepsArgs(TempFileProvider d) {
+        private static string[] CreateCheckDepsArgs(DisposingFile d) {
             return new[] {
-                Program.ConfigureOption.Opt, typeof(CheckDeps).Name, "{",
-                CheckDeps.DefaultRuleFileOption + "=" + d.Filename, "}", TestAssemblyPath
+                TestAssemblyPath,
+                Program.ConfigureOption.Opt, typeof(CheckDeps).Name, "{", CheckDeps.DefaultRuleFileOption + "=" + d.Filename, "}",
+                Program.TransformOption.Opt, typeof(CheckDeps).Name,
+                Program.WriteDipOption.Opt, "yyy",
             };
-        }
-
-        private static string CreateTempDotNetDepFileName() {
-            return Path.GetTempFileName() + ".dll.dep";
         }
 
         [TestMethod]
         public void ExitOkAspects() {
-            using (var d = new TempFileProvider(CreateTempDotNetDepFileName())) {
+            using (var d = DisposingFile.CreateTempFileWithTail(".dll.dep")) {
                 using (TextWriter tw = new StreamWriter(d.Filename)) {
                     tw.Write(@"
-                    $ DOTNETCALL ---> DOTNETCALL
+                    $ DOTNETITEM ---> DOTNETITEM
                   
                     ::* ---> ::mscorlib
 
                     ** ---> **
 
                     // Schlägt fehlt, weil eine SpecialMethod auch auf YetAnotherMethod zugreift!
-                    **::*SpecialMethod* {
+                    **::*SpecialMethod* ---> : {
                         ---> System:*
                         ---> **::*SpecialMethod*
                         ---> **::*ExtraordinaryMethod*
@@ -278,10 +276,10 @@ NDepCheck:Tests ---> **
 
         [TestMethod]
         public void NestedMacroTest1() {
-            using (var d = new TempFileProvider(CreateTempDotNetDepFileName())) {
+            using (var d = DisposingFile.CreateTempFileWithTail(".dll.dep")) {
                 using (TextWriter tw = new StreamWriter(d.Filename)) {
                     tw.Write(@"
-                    $ DOTNETCALL ---> DOTNETCALL
+                    $ DOTNETITEM ---> DOTNETITEM
                   
                     _B.** ---> _B.**
                     _B.** ---> System.**
@@ -301,8 +299,8 @@ NDepCheck:Tests ---> **
         }
 
         [TestMethod]
-        public void Exit7OnMissingDefaultSet() {
-            Assert.AreEqual(Program.EXCEPTION_RESULT,
+        public void Exit4OnMissingDefaultSet() {
+            Assert.AreEqual(Program.FILE_NOT_FOUND_RESULT,
                 Program.Main(new[] {
                     Program.ConfigureOption.Opt, typeof(CheckDeps).FullName, "{", "-rf=nonexistingfile.dep", "}",
                     TestAssemblyPath
@@ -311,11 +309,11 @@ NDepCheck:Tests ---> **
 
         [TestMethod]
         public void ExitDependenciesNotOk() {
-            using (var d = new TempFileProvider(CreateTempDotNetDepFileName())) {
+            using (var d = DisposingFile.CreateTempFileWithTail(".dll.dep")) {
                 // The rules are not enough for the test assembly - we expect return result 3
                 using (TextWriter tw = new StreamWriter(d.Filename)) {
                     tw.Write(@"
-                   $ DOTNETCALL ---> DOTNETCALL
+                   $ DOTNETITEM ---> DOTNETITEM
                   
                    ** ---> blabla
                 ");
@@ -327,7 +325,7 @@ NDepCheck:Tests ---> **
 
         [TestMethod]
         public void ExitNoRuleGroupsFoundForEmptyDepFile() {
-            using (var d = new TempFileProvider(CreateTempDotNetDepFileName())) {
+            using (var d = DisposingFile.CreateTempFileWithTail(".dll.dep")) {
                 using (TextWriter tw = new StreamWriter(d.Filename)) {
                     tw.Write("");
                 }
@@ -335,13 +333,11 @@ NDepCheck:Tests ---> **
             }
         }
 
-
         [TestMethod]
         public void ExitDependenciesNotOkAspects() {
-
-            using (var d = new TempFileProvider(CreateTempDotNetDepFileName())) {
+            using (var d = DisposingFile.CreateTempFileWithTail(".dll.dep")) {
                 using (TextWriter tw = new StreamWriter(d.Filename)) {
-                    tw.Write(@"$ DOTNETCALL ---> DOTNETCALL
+                    tw.Write(@"$ DOTNETITEM ---> DOTNETITEM
 
                     NDepCheck.TestAssembly.** ---> NDepCheck.TestAssembly.**
                     NDepCheck.TestAssembly.** ---> System.**
@@ -349,9 +345,9 @@ NDepCheck:Tests ---> **
                     -:* ---? System:*
 
                     // Schlägt fehlt, weil eine SpecialMethod auch auf ExtraordinaryMethod zugreift!
-                    :::*SpecialMethod* {
-                        ---> System:*
-                        ---> :::*SpecialMethod*
+                    :::*SpecialMethod* ---> : {
+                       : ---> System:*
+                         ---> :::*SpecialMethod*
                     }
                     ");
                 }
@@ -364,9 +360,9 @@ NDepCheck:Tests ---> **
 
         [TestMethod]
         public void ExitFileNotFound() {
-            using (var d = new TempFileProvider(CreateTempDotNetDepFileName())) {
+            using (var d = DisposingFile.CreateTempFileWithTail(".dll.dep")) {
                 using (TextWriter tw = new StreamWriter(d.Filename)) {
-                    tw.Write(@"$ DOTNETCALL ---> DOTNETCALL
+                    tw.Write(@"$ DOTNETITEM ---> DOTNETITEM
 
                     : ---> blabla
                 ");
@@ -378,9 +374,9 @@ NDepCheck:Tests ---> **
 
         [TestMethod]
         public void ExitException() {
-            using (var d = new TempFileProvider(CreateTempDotNetDepFileName())) {
+            using (var d = DisposingFile.CreateTempFileWithTail(".dll.dep")) {
                 using (TextWriter tw = new StreamWriter(d.Filename)) {
-                    tw.Write(@"$ DOTNETCALL ---> DOTNETCALL
+                    tw.Write(@"$ DOTNETITEM ---> DOTNETITEM
 
                     // Bad - contains --->
                     =---> :=    
@@ -395,25 +391,25 @@ NDepCheck:Tests ---> **
                 }
                 Assert.AreEqual(Program.EXCEPTION_RESULT, Program.Main(CreateCheckDepsArgs(d)));
             }
-            using (var d = new TempFileProvider(CreateTempDotNetDepFileName())) {
+            using (var d = DisposingFile.CreateTempFileWithTail(".dll.dep")) {
                 using (TextWriter tw = new StreamWriter(d.Filename)) {
-                    tw.Write(@"$ DOTNETCALL ---> DOTNETCALL
+                    tw.Write(@"$ DOTNETITEM ---> DOTNETITEM
 
                     --> :=    
                        ** ---> blabla
                     =:
                 ");
                 }
-                Assert.AreEqual(7, Program.Main(CreateCheckDepsArgs(d)));
+                Assert.AreEqual(Program.EXCEPTION_RESULT, Program.Main(CreateCheckDepsArgs(d)));
             }
         }
 
         [TestMethod]
         public void TestWritePluginption() {
-            using (var d = new TempFileProvider(CreateTempDotNetDepFileName())) {
+            using (var d = DisposingFile.CreateTempFileWithTail(".dll.dep")) {
                 using (TextWriter tw = new StreamWriter(d.Filename)) {
                     tw.Write(@"
-                    $ DOTNETCALL ---> DOTNETCALL
+                    $ DOTNETITEM ---> DOTNETITEM
                   
                     NDepCheck.TestAssembly.** ---> NDepCheck.TestAssembly.**
                     NDepCheck.TestAssembly.**::NDepCheck.TestAssembly ---> System.**::mscorlib
@@ -424,14 +420,14 @@ NDepCheck:Tests ---> **
                     $ DOTNETREF ---> DOTNETREF
                     **          ---> **
 
-                    $ DOTNETCALL      ---> SIMPLE(Name)
+                    $ DOTNETITEM      ---> SIMPLE(Name)
                     ! System**:**     ---> .Net
                     ! Microsoft**:**  ---> .Net
                     ! (**):(**)       ---> \1#\2
                 ");
                 }
 
-                using (var e = new TempFileProvider(Path.GetTempFileName() + ".gif")) {
+                using (var e = DisposingFile.CreateTempFileWithTail(".gif")) {
                     // typeof(FullName) forces copying to known directory ...
                     Assert.AreEqual(0,
                         Program.Main(
@@ -447,7 +443,7 @@ NDepCheck:Tests ---> **
 
         [TestMethod]
         public void TestWriteTestDataOption() {
-            using (var d = new TempFileProvider(Path.GetTempFileName() + ".gif")) {
+            using (var d = DisposingFile.CreateTempFileWithTail(".gif")) {
                 // The usage typeof(...).FullName forces copying of assembly to bin directory.
                 Assert.AreEqual(0,
                     Program.Main(new[] {
@@ -459,7 +455,7 @@ NDepCheck:Tests ---> **
 
         [TestMethod]
         public void TestWriteTestDataOptionWithModulesAndInterfacesRenderer() {
-            using (var d = new TempFileProvider(Path.GetTempFileName() + ".gif")) {
+            using (var d = DisposingFile.CreateTempFileWithTail(".gif")) {
                 Assert.AreEqual(0,
                     Program.Main(new[] {
                         TestAssemblyPath, Program.WriteTestDataOption.Opt, ".",
@@ -472,7 +468,7 @@ NDepCheck:Tests ---> **
 
         [TestMethod]
         public void TestExtendedROptionHelp() {
-            Assert.AreEqual(1, Program.Main(new[] { Program.WriteHelpOption.Opt }));
+            Assert.AreEqual(Program.OPTIONS_PROBLEM, Program.Main(new[] { Program.WriteHelpOption.Opt }));
         }
 
         [TestMethod]
@@ -556,26 +552,26 @@ NDepCheck:Tests ---> **
 
         [TestMethod]
         public void TestHelpForAllReaders() {
-            Assert.AreEqual(1, Program.Main(new[] { Program.ReadPluginHelpOption.Opt, "." }));
-            Assert.AreEqual(1, Program.Main(new[] { Program.ReadHelpOption.Opt }));
+            Assert.AreEqual(Program.OPTIONS_PROBLEM, Program.Main(new[] { Program.ReadPluginHelpOption.Opt, "." }));
+            Assert.AreEqual(Program.OPTIONS_PROBLEM, Program.Main(new[] { Program.ReadHelpOption.Opt }));
         }
 
         [TestMethod]
         public void TestHelpForAllTransformers() {
-            Assert.AreEqual(1, Program.Main(new[] { Program.TransformPluginHelpOption.Opt, "." }));
-            Assert.AreEqual(1, Program.Main(new[] { Program.TransformHelpOption.Opt }));
+            Assert.AreEqual(Program.OPTIONS_PROBLEM, Program.Main(new[] { Program.TransformPluginHelpOption.Opt, "." }));
+            Assert.AreEqual(Program.OPTIONS_PROBLEM, Program.Main(new[] { Program.TransformHelpOption.Opt }));
         }
 
         [TestMethod]
         public void TestHelpForSingleInternalTransformer() {
-            Assert.AreEqual(1, Program.Main(new[] {typeof(MarkDeps).Name, "help" }));
+            Assert.AreEqual(Program.OPTIONS_PROBLEM, Program.Main(new[] { typeof(MarkDeps).Name, "help" }));
         }
 
         [TestMethod]
         public void TestHelpForAllRenderers() {
-            Assert.AreEqual(1, Program.Main(new[] { Program.WritePluginHelpOption.Opt, "." }));
-            Assert.AreEqual(1, Program.Main(new[] { Program.WritePluginHelpOption.Opt }));
-            Assert.AreEqual(1, Program.Main(new[] { Program.WriteHelpOption.Opt }));
+            Assert.AreEqual(Program.OPTIONS_PROBLEM, Program.Main(new[] { Program.WritePluginHelpOption.Opt, "." }));
+            Assert.AreEqual(Program.OPTIONS_PROBLEM, Program.Main(new[] { Program.WritePluginHelpOption.Opt }));
+            Assert.AreEqual(Program.OPTIONS_PROBLEM, Program.Main(new[] { Program.WriteHelpOption.Opt }));
         }
 
         [TestMethod]
@@ -587,11 +583,11 @@ NDepCheck:Tests ---> **
             string resultTxt = Path.GetFullPath("result.txt");
             Console.WriteLine($"Writing to {resultTxt}");
 
-            using (var m = new TempFileProvider(mainScript)) {
-                using (var s1 = new TempFileProvider(script1)) {
-                    using (var s1a = new TempFileProvider(script1a)) {
-                        using (var s2 = new TempFileProvider(script2)) {
-                            using (var result = new TempFileProvider(resultTxt)) {
+            using (DisposingFile m = DisposingFile.Create(mainScript)) {
+                using (DisposingFile s1 = DisposingFile.Create(script1)) {
+                    using (DisposingFile s1a = DisposingFile.Create(script1a)) {
+                        using (DisposingFile s2 = DisposingFile.Create(script2)) {
+                            using (DisposingFile result = DisposingFile.Create(resultTxt)) {
                                 using (var tw = new StreamWriter(m.Filename)) {
                                     tw.WriteLine($"-dc cmd.exe 2 {{ /c echo START > {result} }} " +
                                                  "-dd VALUE1 value1 " +

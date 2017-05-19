@@ -1,8 +1,8 @@
 ﻿using System.IO;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NDepCheck.Rendering;
 using NDepCheck.Transforming.Modifying;
 using System.Linq;
+using NDepCheck.Rendering.TextWriting;
 
 namespace NDepCheck.Tests {
     [TestClass]
@@ -19,7 +19,7 @@ namespace NDepCheck.Tests {
 
             Assert.AreEqual(0, Program.Main(new[] {
                 Program.ConfigureOption.Opt, typeof(ModifyDeps).Name, "{",
-                    ModifyDeps.ModificationsOption.Opt, "--=->=>delete", "--->=>",
+                    ModifyDeps.ModificationsOption.Opt, "--O->=>delete", "--->=>",
                 "}",
                 Program.TransformTestDataOption.Opt, ".", typeof(ModifyDeps).Name,
                 Program.WriteFileOption.Opt, typeof(DipWriter).Name, outFile
@@ -37,7 +37,7 @@ namespace NDepCheck.Tests {
 
             Assert.AreEqual(0, Program.Main(new[] {
                 Program.ConfigureOption.Opt, typeof(ModifyDeps).Name, "{",
-                    ModifyDeps.ModificationsOption.Opt, "--~?~!'->=>delete", "--->=>",
+                    ModifyDeps.ModificationsOption.Opt, "--~?&~!'->=>delete", "--->=>",
                 "}",
                 Program.TransformTestDataOption.Opt, ".", typeof(ModifyDeps).Name,
                 Program.WriteDipOption.Opt, outFile

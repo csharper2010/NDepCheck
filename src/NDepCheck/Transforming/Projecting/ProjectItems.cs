@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using JetBrains.Annotations;
-using NDepCheck.Reading;
+using NDepCheck.Reading.DipReading;
 
 namespace NDepCheck.Transforming.Projecting {
-    public partial class ProjectItems : AbstractTransformerWithConfigurationPerInputfile<ProjectionSet> {
+    public partial class ProjectItems : AbstractTransformerWithFileConfiguration<ProjectionSet> {
         internal const string ABSTRACT_IT_LEFT = "<";
         internal const string ABSTRACT_IT_BOTH = "!";
         internal const string ABSTRACT_IT_RIGHT = ">";
@@ -65,8 +65,7 @@ where
 type     is an NDepCheck type or type definition (see -help types)
 pattern  is an NDepCheck item pattern (see -help itempattern)
 result   is element[:element...], where each element is a string or \1, \2, ...
-         \1 etc. refers to a matched group in the itempattern. \> refers to
-         the item's Order property (which can be set by AddItemOrder).
+         \1 etc. refers to a matched group in the itempattern.
 If no result is provided, result is assumed to be \1:\2:..., with the number
 of groups in the pattern.
 result can also be a single -, in which case a matching item is not projected.
@@ -127,7 +126,7 @@ Examples:
                     return j;
                 }), ProjectionsOption.Action((args, j) => {
                     orderedProjections = GetOrReadChildConfiguration(globalContext,
-                            () => new StringReader(string.Join("\r\n", args.Skip(j + 1))),
+                            () => new StringReader(string.Join(Environment.NewLine, args.Skip(j + 1))),
                             ProjectionsOption.ShortName, globalContext.IgnoreCase, "????", forceReload: true);
                     // ... and all args are read in, so the next arg index is past every argument.
                     return int.MaxValue;
@@ -144,7 +143,7 @@ Examples:
             }
         }
 
-        protected override ProjectionSet CreateConfigurationFromText(GlobalContext globalContext, string fullConfigFileName,
+        protected override ProjectionSet CreateConfigurationFromText([NotNull] GlobalContext globalContext, string fullConfigFileName,
             int startLineNo, TextReader tr, bool ignoreCase, string fileIncludeStack, bool forceReloadConfiguration,
             Dictionary<string, string> configValueCollector) {
 
@@ -222,10 +221,8 @@ Examples:
 
         #region Transform
 
-        public override bool RunsPerInputContext => true;
-
-        public override int Transform(GlobalContext globalContext, [CanBeNull] string dependenciesFileName, IEnumerable<Dependency> dependencies,
-                            string transformOptions, string dependencySourceForLogging, List<Dependency> transformedDependencies) {
+        public override int Transform([NotNull] GlobalContext globalContext, [NotNull, ItemNotNull] IEnumerable<Dependency> dependencies,
+                            string transformOptions, [NotNull] List<Dependency> transformedDependencies) {
             string fullDipName = null;
             bool keepOnlyProjected = false;
             Option.Parse(globalContext, transformOptions, BackProjectionDipFileOption.Action((args, j) => {
@@ -237,16 +234,12 @@ Examples:
             }));
 
             if (fullDipName != null) {
-                // Back projection
+                // Back projection - ProjectItems may use DipReader by design
                 if (_dependenciesForBackProjection == null) {
-                    InputContext localContext = new DipReader(fullDipName).ReadDependencies(0, globalContext.IgnoreCase);
-                    if (localContext == null) {
-                        throw new Exception("Internal Error: new DipReader() will always create new InputContext - cannot be null");
-                    }
-                    _dependenciesForBackProjection = localContext.Dependencies.ToDictionary(
+                    IEnumerable<Dependency> dipDependencies = new DipReader(fullDipName).ReadDependencies(0, globalContext.IgnoreCase).ToArray();
+                    _dependenciesForBackProjection = dipDependencies.ToDictionary(
                         d => new FromTo(d.UsingItem, d.UsedItem), d => d);
                 }
-                Log.WriteInfo("Backprojecting " + dependencySourceForLogging);
 
                 var localCollector = new Dictionary<FromTo, Dependency>();
                 var backProjected = new List<Dependency>();
@@ -269,7 +262,6 @@ Examples:
                 }
                 transformedDependencies.AddRange(keepOnlyProjected ? backProjected : dependencies);
             } else {
-                Log.WriteInfo("Projecting " + dependencySourceForLogging);
                 // Forward projection
                 var localCollector = new Dictionary<FromTo, Dependency>();
                 int missingPatternCount = 0;
@@ -278,6 +270,8 @@ Examples:
                 }
                 transformedDependencies.AddRange(localCollector.Values);
             }
+
+            AfterAllTransforms();
 
             return Program.OK_RESULT;
         }
@@ -316,7 +310,7 @@ Examples:
             }
         }
 
-        public override IEnumerable<Dependency> GetTestDependencies() {
+        public override IEnumerable<Dependency> CreateSomeTestDependencies() {
             ItemType abc = ItemType.New("AB+(A:B)");
             Item a1 = Item.New(abc, "a", "1");
             Item a2 = Item.New(abc, "a", "2");
@@ -328,10 +322,10 @@ Examples:
         }
 
         private Dependency FromTo(Item from, Item to) {
-            return new Dependency(from, to, new TextFileSource("Test", 1), "Use", ct: 1);
+            return new Dependency(from, to, new TextFileSourceLocation("Test", 1), "Use", ct: 1);
         }
 
-        public override void AfterAllTransforms(GlobalContext globalContext) {
+        private void AfterAllTransforms() {
             // reset cached back projection dependencies for next transform
             _dependenciesForBackProjection = null;
 

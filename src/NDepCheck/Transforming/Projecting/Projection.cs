@@ -1,9 +1,10 @@
-// (c) HMMüller 2006...2017
+
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
+using NDepCheck.Matching;
 
 namespace NDepCheck.Transforming.Projecting {
     /// <remarks>
@@ -53,7 +54,7 @@ namespace NDepCheck.Transforming.Projecting {
             Source = source;
             _forLeftSide = forLeftSide;
             _forRightSide = forRightSide;
-            ItemMatch = new ItemMatch(sourceItemTypeOrNull, pattern, ignoreCase);
+            ItemMatch = new ItemMatch(sourceItemTypeOrNull, pattern, 0, ignoreCase);
         }
 
         /// <summary>
@@ -67,19 +68,18 @@ namespace NDepCheck.Transforming.Projecting {
             if (left && !_forLeftSide || !left && !_forRightSide) {
                 return null;
             } else {
-                string[] matchResultGroups = ItemMatch.Matches(item);
+                var matchResultGroups = ItemMatch.Matches(item);
 
-                if (matchResultGroups == null) {
+                if (!matchResultGroups.Success) {
                     return null;
                 } else {
                     IEnumerable<string> targets = _targetSegments;
-                    for (int i = 0; i < matchResultGroups.Length; i++) {
+                    for (int i = 0; i < matchResultGroups.Groups.Length; i++) {
                         int matchResultIndex = i;
-                        targets = targets.Select(s => s.Replace("\\" + (matchResultIndex + 1), matchResultGroups[matchResultIndex]));
+                        targets = targets.Select(s => s.Replace("\\" + (matchResultIndex + 1), matchResultGroups.Groups[matchResultIndex]));
                     }
-                    targets = targets.Select(s => s.Replace("\\>", item.Order ?? ""));
                     _matchCount++;
-                    return Item.New(_targetItemType, targets.Select(t => GlobalContext.ExpandHexChars(t)).ToArray()).SetOrder(item.Order);
+                    return Item.New(_targetItemType, targets.Select(t => GlobalContext.ExpandHexChars(t)).ToArray());
                 }
             }
         }
